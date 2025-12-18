@@ -5,49 +5,60 @@ import { SkeletonUtils } from 'three-stdlib';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import * as THREE from 'three';
 
-// --- MAPPING STRATEGIES ---
-
-// 1. STANDARD (Oculus/RPM default)
-const VISEME_MAP_STANDARD = {
-    0: 'viseme_sil', 1: 'viseme_aa', 2: 'viseme_aa', 3: 'viseme_O',
-    4: 'viseme_E', 5: 'viseme_RR', 6: 'viseme_I', 7: 'viseme_U',
-    8: 'viseme_O', 9: 'viseme_aa', 10: 'viseme_O', 11: 'viseme_aa',
-    12: 'viseme_nn', 13: 'viseme_RR', 14: 'viseme_nn', 15: 'viseme_nn',
-    16: 'viseme_nn', 17: 'viseme_TH', 18: 'viseme_FF', 19: 'viseme_DD',
-    20: 'viseme_kk', 21: 'viseme_PP'
-};
-
-// 2. ARKIT (Apple Face Tracking)
+// --- 1. VISUAL MAPPING (AZURE ID -> ARKIT SHAPES) ---
+// This maps the sound to the specific ARKit muscles
 const VISEME_MAP_ARKIT = {
-    0: {}, 1: { jawOpen: 0.4 }, 2: { jawOpen: 0.5 }, 3: { jawOpen: 0.3, mouthFunnel: 0.4 },
-    4: { jawOpen: 0.2, mouthSmileLeft: 0.2, mouthSmileRight: 0.2 },
-    5: { jawOpen: 0.1, mouthPucker: 0.4 }, 6: { jawOpen: 0.1, mouthSmileLeft: 0.3, mouthSmileRight: 0.3 },
-    7: { mouthPucker: 0.7 }, 8: { jawOpen: 0.3, mouthFunnel: 0.4 }, 9: { jawOpen: 0.4 },
-    10: { jawOpen: 0.3, mouthFunnel: 0.4 }, 11: { jawOpen: 0.4 }, 12: { jawOpen: 0.1 },
-    13: { jawOpen: 0.1, mouthPucker: 0.4 }, 14: { jawOpen: 0.1 }, 15: { jawOpen: 0.1 },
-    16: { jawOpen: 0.1 }, 17: { jawOpen: 0.1 }, 18: { mouthPucker: 0.3, mouthRollUpper: 0.2 },
-    19: { jawOpen: 0.1 }, 20: { jawOpen: 0.2 }, 21: { mouthPucker: 0.4 }
+    0: {}, // Silence
+    1: { jawOpen: 0.4 }, // aa
+    2: { jawOpen: 0.5 }, // aa
+    3: { jawOpen: 0.3, mouthFunnel: 0.4 }, // O
+    4: { jawOpen: 0.2, mouthSmileLeft: 0.2, mouthSmileRight: 0.2 }, // E (slight smile)
+    5: { jawOpen: 0.1, mouthPucker: 0.4 }, // RR
+    6: { jawOpen: 0.1, mouthSmileLeft: 0.3, mouthSmileRight: 0.3 }, // I
+    7: { mouthPucker: 0.7 }, // U
+    8: { jawOpen: 0.3, mouthFunnel: 0.4 }, // O
+    9: { jawOpen: 0.4 }, // aa
+    10: { jawOpen: 0.3, mouthFunnel: 0.4 }, // O
+    11: { jawOpen: 0.4 }, // aa
+    12: { jawOpen: 0.1 }, // nn
+    13: { jawOpen: 0.1, mouthPucker: 0.4 }, // RR
+    14: { jawOpen: 0.1 }, // nn
+    15: { jawOpen: 0.1 }, // nn
+    16: { jawOpen: 0.1 }, // nn
+    17: { jawOpen: 0.1 }, // TH
+    18: { mouthPucker: 0.3, mouthRollUpper: 0.2 }, // FF
+    19: { jawOpen: 0.1 }, // DD
+    20: { jawOpen: 0.2 }, // kk
+    21: { mouthPucker: 0.4 } // PP
 };
 
-// 3. UPDATED EMOTIONS (Matches your 'mouthSmileLeft'/'Right' logs)
+// --- 2. EMOTION RECIPES (ARKIT SPECIFIC) ---
+// Note: We split smiles into Left/Right because that's how ARKit works
 const EXPRESSIONS = {
-    neutral: {},
+    neutral: {
+        browInnerUp: 0.0,
+        mouthSmileLeft: 0.0, mouthSmileRight: 0.0
+    },
     happy: {
-        mouthSmileLeft: 0.5, mouthSmileRight: 0.5,
         browInnerUp: 0.3,
+        eyeSquintLeft: 0.2, eyeSquintRight: 0.2,
+        mouthSmileLeft: 0.6, mouthSmileRight: 0.6,
         cheekPuff: 0.1
     },
     sad: {
-        mouthFrownLeft: 0.5, mouthFrownRight: 0.5,
-        browDownLeft: 0.4, browDownRight: 0.4
+        browDownLeft: 0.5, browDownRight: 0.5,
+        mouthFrownLeft: 0.6, mouthFrownRight: 0.6,
+        eyeLookDownLeft: 0.2, eyeLookDownRight: 0.2
     },
     surprised: {
         browInnerUp: 0.8,
-        eyeWideLeft: 0.5, eyeWideRight: 0.5
+        eyeWideLeft: 0.6, eyeWideRight: 0.6,
+        jawOpen: 0.1 // Slight mouth open
     },
     angry: {
         browDownLeft: 0.8, browDownRight: 0.8,
-        noseSneerLeft: 0.5, noseSneerRight: 0.5
+        noseSneerLeft: 0.5, noseSneerRight: 0.5,
+        eyeSquintLeft: 0.5, eyeSquintRight: 0.5
     }
 };
 
@@ -56,52 +67,49 @@ export function Model({ textToSpeak, emotion = "neutral", ...props }) {
     const clone = useMemo(() => SkeletonUtils.clone(scene), [scene]);
     const { nodes } = useGraph(clone);
 
-    // REFS
+    // --- REFS & STATE ---
     const audioPlayer = useRef(new Audio());
     const visemeData = useRef([]);
     const synthesizerRef = useRef(null);
     const headMeshRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [morphType, setMorphType] = useState(null);
 
-    // --- 1. SETUP & DETECT MORPHS ---
+    // --- 3. AUTO-DETECT HEAD MESH ---
     useEffect(() => {
         let foundHead = null;
         clone.traverse((child) => {
+            // Find the mesh with morph targets (Face)
             if (child.isMesh && child.morphTargetDictionary && Object.keys(child.morphTargetDictionary).length > 0) {
+                // Prefer one named "Wolf3D_Head" or similar
                 if (!foundHead || child.name.includes("Head") || child.name.includes("Avatar")) {
                     foundHead = child;
                 }
             }
         });
-
         if (foundHead) {
             headMeshRef.current = foundHead;
-            const dict = foundHead.morphTargetDictionary;
-
-            // Standard Mapping Detection
-            if (Object.keys(dict).includes('viseme_aa')) {
-                setMorphType('standard');
-            } else if (Object.keys(dict).includes('jawOpen')) {
-                setMorphType('arkit');
-            }
+            console.log("✅ ARKit Head Mesh Configured:", foundHead.name);
         }
     }, [clone]);
 
-    // --- 2. SAFE SPEECH GENERATION (Fixes "Object Disposed" Crash) ---
+    // --- 4. SAFE AUDIO GENERATION (Crash Proof) ---
     useEffect(() => {
-        let isMounted = true; // Track if component is alive
+        let isMounted = true;
 
-        // STOP previous audio/synthesis immediately
+        // STOP previous audio
         audioPlayer.current.pause();
+        audioPlayer.current.currentTime = 0;
         setIsPlaying(false);
+
         if (synthesizerRef.current) {
-            try { synthesizerRef.current.close(); } catch (e) { console.warn("Cleanup warning:", e); }
-            synthesizerRef.current = null;
+            const oldSynth = synthesizerRef.current;
+            synthesizerRef.current = null; // Clear ref first
+            try { oldSynth.close(); } catch (e) { /* Already disposed, ignore */ }
         }
 
         if (!textToSpeak) return;
 
+        // AZURE CONFIG
         const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(
             import.meta.env.VITE_AZURE_KEY,
             import.meta.env.VITE_AZURE_REGION
@@ -112,85 +120,88 @@ export function Model({ textToSpeak, emotion = "neutral", ...props }) {
         synthesizerRef.current = synthesizer;
         visemeData.current = [];
 
+        // Capture Visemes
         synthesizer.visemeReceived = (s, e) => {
             const timeInSeconds = e.audioOffset / 10000000;
             visemeData.current.push({ time: timeInSeconds, id: e.visemeId });
         };
 
+        // Speak
         synthesizer.speakTextAsync(
             textToSpeak,
             (result) => {
-                // IF UNMOUNTED, STOP HERE
                 if (!isMounted) {
                     try { synthesizer.close(); } catch (e) { }
                     return;
                 }
-
                 if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
                     const blob = new Blob([result.audioData], { type: 'audio/wav' });
                     const url = URL.createObjectURL(blob);
                     audioPlayer.current.src = url;
                     audioPlayer.current.play().then(() => setIsPlaying(true)).catch(console.error);
                 }
-
-                // Close nicely
                 try { synthesizer.close(); } catch (e) { }
-                synthesizerRef.current = null;
             },
             (error) => {
                 console.error("Speech Error:", error);
-                if (isMounted) {
-                    try { synthesizer.close(); } catch (e) { }
-                }
+                if (isMounted) try { synthesizer.close(); } catch (e) { }
             }
         );
 
-        // Cleanup function
-        return () => {
-            isMounted = false;
-            if (synthesizerRef.current) {
-                try { synthesizerRef.current.close(); } catch (e) { }
-            }
-        };
+        return () => { isMounted = false; };
     }, [textToSpeak]);
 
-    // --- 3. ANIMATION LOOP ---
+    // --- 5. THE ANIMATION LOOP (EXPRESSION HANDLER) ---
     useFrame(() => {
-        if (!headMeshRef.current || !morphType) return;
+        if (!headMeshRef.current) return;
         const mesh = headMeshRef.current;
-        const currentTime = audioPlayer.current.currentTime;
 
+        // Safety: Stop playing state if audio ended
         if (isPlaying && audioPlayer.current.ended) setIsPlaying(false);
 
-        // 1. EMOTION BASE LAYER
-        const currentEmotion = EXPRESSIONS[emotion] || EXPRESSIONS.neutral;
-        let finalMorphs = { ...currentEmotion };
+        // --- STEP A: CALCULATE TARGET MORPHS ---
 
-        // 2. VISEME OVERLAY
+        // Normalize emotion to lowercase (backend may send "HAPPY" but we need "happy")
+        const normalizedEmotion = (emotion || "neutral").toLowerCase();
+
+        // Debug: Log emotion changes
+        // console.log("Current Emotion:", normalizedEmotion, "HeadMesh:", mesh.name);
+
+        // 1. Start with the Base Emotion
+        const currentEmotionData = EXPRESSIONS[normalizedEmotion] || EXPRESSIONS.neutral;
+        let finalMorphs = { ...currentEmotionData };
+
+        // 2. If Playing, OVERRIDE with Visemes
         if (isPlaying && !audioPlayer.current.paused) {
+            const currentTime = audioPlayer.current.currentTime;
             const activeViseme = visemeData.current.findLast(v => v.time <= currentTime);
+
             if (activeViseme) {
-                if (morphType === 'standard') {
-                    const targetName = VISEME_MAP_STANDARD[activeViseme.id];
-                    if (targetName) finalMorphs[targetName] = 1.0;
-                } else if (morphType === 'arkit') {
-                    const arkitMorphs = VISEME_MAP_ARKIT[activeViseme.id];
-                    if (arkitMorphs) {
-                        Object.keys(arkitMorphs).forEach(key => { finalMorphs[key] = arkitMorphs[key]; });
-                    }
+                const visemeMorphs = VISEME_MAP_ARKIT[activeViseme.id];
+                if (visemeMorphs) {
+                    Object.keys(visemeMorphs).forEach((key) => {
+                        // Add or Overwrite the emotion value with the speech value
+                        // e.g., if Emotion has jawOpen: 0.0 and Speech has jawOpen: 0.5 -> We use 0.5
+                        finalMorphs[key] = visemeMorphs[key];
+                    });
                 }
             }
         }
 
-        // 3. APPLY MORPHS
+        // --- STEP B: APPLY TO MESH ---
+        // Iterate through EVERY morph target the mesh has
         Object.keys(mesh.morphTargetDictionary).forEach((key) => {
             const index = mesh.morphTargetDictionary[key];
+
+            // If our calculated "finalMorphs" has a value for this key, use it. 
+            // Otherwise, target is 0 (relax the muscle).
             const targetValue = finalMorphs[key] || 0;
 
+            // Smoothly interpolate (Lerp) current value to target value
             mesh.morphTargetInfluences[index] = THREE.MathUtils.lerp(
                 mesh.morphTargetInfluences[index],
                 targetValue,
-                0.2
+                0.2 // Speed: 0.1 = Slow/Dreamy, 0.3 = Snappy
             );
         });
     });

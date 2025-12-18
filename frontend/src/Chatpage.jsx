@@ -70,6 +70,7 @@ export default function ChatPage() {
 
             // Update Avatar State
             console.log("Avatar Response:", data);
+            console.log("Setting emotion to:", data.emotion);  // DEBUG
             setAvatarEmotion(data.emotion); // e.g., "happy", "sad"
             setAvatarText(data.text);       // The text the avatar will speak
 
