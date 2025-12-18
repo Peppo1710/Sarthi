@@ -1,43 +1,37 @@
-// src/ChatPage.jsx
 import React, { useState, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Environment, OrbitControls, Loader } from "@react-three/drei";
 import { Mic, Send, Square } from "lucide-react";
 import * as SpeechSDK from "microsoft-cognitiveservices-speech-sdk";
-import { Model } from "./Avatar"; // Import your Avatar component
+import { Model } from "./Avatar"; // Importing the rewritten Avatar component
 
 export default function ChatPage() {
     const [start, setStart] = useState(false);
     const [userInput, setUserInput] = useState("");
     const [isListening, setIsListening] = useState(false);
 
-    // Data for the Avatar
-    const [avatarAudio, setAvatarAudio] = useState(null);
+    // Avatar State
+    const [avatarText, setAvatarText] = useState("");
     const [avatarEmotion, setAvatarEmotion] = useState("neutral");
 
-    // --- 1. SPEECH TO TEXT (AZURE) ---
+    // --- 1. SPEECH TO TEXT (MICROPHONE) ---
     const startListening = () => {
         setIsListening(true);
-
-        // SETUP AZURE CONFIG (REPLACE THESE WITH YOUR KEYS)
         const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(
-            "PASTE_YOUR_AZURE_KEY_HERE",
-            "PASTE_YOUR_REGION_HERE"
+            import.meta.env.VITE_AZURE_KEY,
+            import.meta.env.VITE_AZURE_REGION
         );
         speechConfig.speechRecognitionLanguage = "en-US";
 
         const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
         const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
 
-        // Real-time updates
         recognizer.recognizing = (s, e) => {
             setUserInput(e.result.text);
         };
 
-        // Final sentence
         recognizer.recognized = (s, e) => {
             if (e.result.text) {
-                // Appending text if you pause and speak again
                 setUserInput(prev => (prev ? prev + " " : "") + e.result.text);
             }
         };
@@ -54,38 +48,36 @@ export default function ChatPage() {
         }
     };
 
-    // --- 2. SEND TO BACKEND (Python Server) ---
+    // --- 2. SEND TO BACKEND ---
     const handleSend = async () => {
         if (!userInput) return;
-
-        // Stop listening if we hit send
         if (isListening) stopListening();
 
-        console.log("Sending to Backend:", userInput);
+        console.log("User Input:", userInput);
 
         try {
-            // Call your local Python backend
+            // Send user text to your Python backend
+            // Ensure your backend returns JSON: { "text": "...", "emotion": "..." }
             const response = await fetch("http://localhost:8000/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: userInput })
             });
 
-            if (!response.ok) throw new Error("Backend error");
+            if (!response.ok) throw new Error("Backend connection failed");
 
             const data = await response.json();
 
             // Update Avatar State
-            console.log("Received Emotion:", data.emotion);
-            setAvatarEmotion(data.emotion);
-            setAvatarAudio(data.audio); // This triggers the useEffect in Avatar.jsx
+            console.log("Avatar Response:", data);
+            setAvatarEmotion(data.emotion); // e.g., "happy", "sad"
+            setAvatarText(data.text);       // The text the avatar will speak
 
         } catch (error) {
-            console.error("Failed to fetch from backend:", error);
-            alert("Is your Python backend running? Check console.");
+            console.error("Fetch error:", error);
+            alert("Could not connect to backend. Is Python running?");
         }
 
-        // Optional: Clear input or keep it to show what was said
         setUserInput("");
     };
 
@@ -100,15 +92,23 @@ export default function ChatPage() {
             )}
 
             {/* --- 3D SCENE --- */}
-            <Canvas camera={{ position: [0, 0, 5], fov: 40 }}>
+            <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
                 <Environment preset="sunset" />
-                <ambientLight intensity={0.7} />
-                <OrbitControls enableZoom={false} target={[0, 1.5, 0]} /> {/* Focus on face */}
+                <ambientLight intensity={0.8} />
+                <directionalLight position={[5, 5, 5]} intensity={0.5} />
+
+                <OrbitControls
+                    enableZoom={false}
+                    enablePan={false}
+                    target={[0, 0, 0]}
+                    minPolarAngle={Math.PI / 2.5}
+                    maxPolarAngle={Math.PI / 2}
+                />
 
                 <Suspense fallback={null}>
                     {start && (
                         <Model
-                            audioSource={avatarAudio}
+                            textToSpeak={avatarText}
                             emotion={avatarEmotion}
                             position={[0, -3, 0]}
                             scale={2}
@@ -147,7 +147,7 @@ export default function ChatPage() {
     );
 }
 
-// Simple Styles Object
+// Styles
 const styles = {
     overlay: {
         position: "absolute", top: 0, left: 0, width: "100%", height: "100%",

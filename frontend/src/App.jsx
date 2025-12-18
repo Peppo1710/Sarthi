@@ -4,7 +4,7 @@ import Navbar from './components/Navbar';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
-import ChatPage from './pages/ChatPage';
+import ChatPage from './Chatpage'; // Modified import path
 import ProfilePage from './pages/ProfilePage';
 import CustomizePage from './pages/CustomizePage';
 
