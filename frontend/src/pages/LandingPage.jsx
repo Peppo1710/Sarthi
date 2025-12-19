@@ -1,54 +1,152 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-// Navbar is now handled in App.jsx layout, so we remove it from here to avoid duplication
-// or we can keep it if we want a specifically different landing navbar.
-// For now, let's assume App.jsx handles the global Navbar, or we import it here.
-// But the plan says "Refactor Navbar", suggesting a global component.
-// Let's remove the inline nav and let App.jsx handle it, OR import the new Navbar.
-// Given strict reqs, let's make LandingPage cleaner.
+import { TypeAnimation } from 'react-type-animation';
 
 export default function LandingPage() {
-    return (
-        <div className="min-h-[calc(100vh-80px)] flex flex-col bg-cream text-charcoal font-sans">
-            {/* Hero Section */}
-            <main className="flex-1 flex flex-col items-center justify-center text-center px-4">
-                <h1 className="text-5xl md:text-7xl font-serif font-bold text-sage mb-6 leading-tight">
-                    Your Intelligent <br /> Voice Companion
-                </h1>
-                <p className="text-xl md:text-2xl text-charcoal/70 max-w-2xl mb-12 font-light">
-                    A warm, safe space for meaningful connection. Always listening, always there.
-                </p>
+    const isLoggedIn = !!localStorage.getItem('sarthi_phone');
 
-                <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                    {localStorage.getItem('sarthi_phone') ? (
-                        <Link
-                            to="/chat"
-                            className="px-12 py-5 bg-sage text-white text-xl font-medium rounded-2xl hover:bg-[#5b7a1e] transition-colors shadow-xl shadow-sage/30 text-center w-full sm:w-auto"
-                        >
-                            Go to Chat
-                        </Link>
-                    ) : (
-                        <>
-                            <Link
-                                to="/signup"
-                                className="px-8 py-4 bg-sage text-white text-lg font-medium rounded-2xl hover:bg-[#5b7a1e] transition-colors shadow-lg shadow-sage/20 text-center"
-                            >
-                                Get Started
+    return (
+        <div style={styles.container}>
+            {/* Hero Section - 50/50 Split */}
+            <main style={styles.heroSection}>
+                {/* Left Side - Text Content */}
+                <div style={styles.leftSide}>
+                    <div style={styles.textContent}>
+                        {/* Animated Title using react-type-animation */}
+                        <h1 style={styles.title}>
+                            <TypeAnimation
+                                sequence={[
+                                    'Sarthi',
+                                    3000,
+                                    'सारथी',
+                                    3000,
+                                ]}
+                                wrapper="span"
+                                speed={50}
+                                repeat={Infinity}
+                                style={styles.titleText}
+                            />
+                        </h1>
+
+                        {/* Static Tagline */}
+                        <h2 style={styles.tagline}>
+                            Ek dost jo hamesha sath de
+                        </h2>
+
+                        {/* Primary CTA */}
+                        {isLoggedIn ? (
+                            <Link to="/chat" style={styles.ctaButton}>
+                                Start Talking
                             </Link>
-                            <Link
-                                to="/login"
-                                className="px-8 py-4 bg-white border-2 border-sage/20 text-sage text-lg font-medium rounded-2xl hover:bg-sage/5 transition-colors text-center"
-                            >
-                                Log In
+                        ) : (
+                            <Link to="/signup" style={styles.ctaButton}>
+                                Start Talking
                             </Link>
-                        </>
-                    )}
+                        )}
+                    </div>
+                </div>
+
+                {/* Right Side - Hero Image */}
+                <div style={styles.rightSide}>
+                    <img
+                        src="/heroheader.png"
+                        alt="Sarthi AI Companion"
+                        style={styles.heroImage}
+                    />
                 </div>
             </main>
 
-            <footer className="p-6 text-center text-charcoal/40 text-sm">
-                &copy; {new Date().getFullYear()} Sarthi. All rights reserved.
+            {/* Footer */}
+            <footer style={styles.footer}>
+                © {new Date().getFullYear()} Sarthi. All rights reserved.
             </footer>
         </div>
     );
 }
+
+const styles = {
+    container: {
+        minHeight: 'calc(100vh - 90px)',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#FDFCF0',
+    },
+    heroSection: {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: '40px 60px',
+        maxWidth: '1400px',
+        margin: '0 auto',
+        width: '100%',
+        gap: '60px',
+    },
+    leftSide: {
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    textContent: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: '24px',
+        maxWidth: '500px',
+    },
+    title: {
+        margin: 0,
+        minHeight: '100px',
+        display: 'flex',
+        alignItems: 'center',
+    },
+    titleText: {
+        fontSize: '80px',
+        fontWeight: '700',
+        color: '#2D2D2D',
+        letterSpacing: '-2px',
+        display: 'inline-block',
+    },
+    tagline: {
+        fontSize: '24px',
+        fontWeight: '400',
+        color: 'rgba(45, 45, 45, 0.7)',
+        margin: 0,
+        marginTop: '8px',
+        lineHeight: '1.5',
+    },
+    ctaButton: {
+        marginTop: '40px',
+        padding: '20px 48px',
+        fontSize: '20px',
+        fontWeight: '600',
+        color: '#FFFFFF',
+        backgroundColor: '#E07A5F',
+        border: 'none',
+        borderRadius: '50px',
+        textDecoration: 'none',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        boxShadow: '0 8px 30px rgba(224, 122, 95, 0.3)',
+    },
+    rightSide: {
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+    },
+    heroImage: {
+        maxWidth: '100%',
+        maxHeight: '500px',
+        objectFit: 'contain',
+        borderRadius: '20px',
+    },
+    footer: {
+        padding: '24px',
+        textAlign: 'center',
+        color: 'rgba(45, 45, 45, 0.4)',
+        fontSize: '14px',
+    },
+};

@@ -4,25 +4,26 @@ import { Link, useNavigate } from 'react-router-dom';
 export default function LoginPage() {
     const [step, setStep] = useState('phone'); // phone | otp
     const [phone, setPhone] = useState('');
-    const [otp, setOtp] = useState(['', '', '', '', '', '']); // 6 Digits for Fixed OTP
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
 
     const handleSendCode = async () => {
+        if (!phone.trim()) {
+            setError('Please enter your phone number');
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         // Format phone number to E.164
         let formattedPhone = phone.trim();
-        // Remove all non-numeric chars except +
         formattedPhone = formattedPhone.replace(/[^\d+]/g, '');
-
-        // Default to India (+91) if 10 digits provided without code
         if (formattedPhone.length === 10 && !formattedPhone.startsWith('+')) {
             formattedPhone = '+91' + formattedPhone;
         }
-        // Ensure it starts with +
         if (!formattedPhone.startsWith('+')) {
             formattedPhone = '+' + formattedPhone;
         }
@@ -36,7 +37,6 @@ export default function LoginPage() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
 
-            // Update state with formatted phone for verification step
             setPhone(formattedPhone);
             setStep('otp');
         } catch (err) {
@@ -47,11 +47,16 @@ export default function LoginPage() {
     };
 
     const handleVerify = async () => {
+        const token = otp.join('');
+        if (token.length !== 6) {
+            setError('Please enter the complete 6-digit code');
+            return;
+        }
+
         setLoading(true);
         setError(null);
+
         try {
-            // Join all 6 digits
-            const token = otp.join('');
             const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/verify-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -60,9 +65,8 @@ export default function LoginPage() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Invalid OTP');
 
-            // Save phone to link profile later
             localStorage.setItem('sarthi_phone', phone);
-            navigate('/'); // Redirect to home/dashboard
+            navigate('/');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -70,7 +74,6 @@ export default function LoginPage() {
         }
     };
 
-    // Helper for OTP input change
     const handleOtpChange = (element, index) => {
         if (isNaN(element.value)) return;
 
@@ -78,72 +81,83 @@ export default function LoginPage() {
         newOtp[index] = element.value;
         setOtp(newOtp);
 
-        // Focus next input automatically
         if (element.value && element.nextSibling) {
             element.nextSibling.focus();
         }
     };
 
     const handleKeyDown = (e, index) => {
-        // Handle backspace to focus previous
         if (e.key === 'Backspace' && !otp[index] && e.target.previousSibling) {
             e.target.previousSibling.focus();
         }
-        // Allow Enter to submit on last digit
         if (e.key === 'Enter' && index === 5) {
             handleVerify();
         }
     };
 
     return (
-        <div className="min-h-screen flex flex-col justify-center items-center bg-cream p-4 font-sans text-charcoal">
-            <div className="w-full max-w-md">
-                <div className="mb-8 text-center">
-                    <Link to="/" className="text-2xl font-serif font-bold text-sage block mb-8">Sarthi</Link>
-                </div>
+        <div style={styles.container}>
+            <div style={styles.card}>
+                {/* Brand */}
+                <Link to="/" style={styles.brand}>
+                    Sarthi
+                </Link>
 
+                {/* Error */}
                 {error && (
-                    <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center">
+                    <div style={styles.error}>
                         {error}
                     </div>
                 )}
 
                 {step === 'phone' && (
-                    <div className="flex flex-col space-y-6">
-                        <div className="text-center">
-                            <h2 className="text-3xl font-serif font-bold text-sage mb-2">Welcome Back</h2>
-                            <p className="text-charcoal/70">Enter your phone number to continue.</p>
+                    <>
+                        {/* Header */}
+                        <div style={styles.header}>
+                            <h1 style={styles.title}>Welcome Back</h1>
+                            <p style={styles.subtitle}>Enter your phone number to continue</p>
                         </div>
 
-                        <input
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            className="w-full text-2xl bg-white border border-sage/20 rounded-xl p-4 focus:border-sage focus:outline-none focus:ring-1 focus:ring-sage transition-colors placeholder-sage/30"
-                            placeholder="+1 5550000000"
-                            autoFocus
-                            disabled={loading}
-                        />
+                        {/* Phone Input */}
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Phone Number</label>
+                            <input
+                                type="tel"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                style={styles.input}
+                                placeholder="+91 9876543210"
+                                autoFocus
+                                disabled={loading}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSendCode()}
+                            />
+                        </div>
 
                         <button
                             onClick={handleSendCode}
                             disabled={loading}
-                            className="w-full bg-sage text-white text-lg font-medium py-4 rounded-xl hover:bg-[#5b7a1e] transition-colors shadow-lg shadow-sage/20 disabled:opacity-50"
+                            style={{
+                                ...styles.submitBtn,
+                                opacity: loading ? 0.7 : 1,
+                                cursor: loading ? 'not-allowed' : 'pointer'
+                            }}
                         >
                             {loading ? 'Sending...' : 'Send Code'}
                         </button>
-                    </div>
+                    </>
                 )}
 
                 {step === 'otp' && (
-                    <div className="flex flex-col space-y-6">
-                        <div className="text-center">
-                            <h2 className="text-3xl font-serif font-bold text-sage mb-2">Enter OTP</h2>
-                            <p className="text-charcoal/70">We sent a code to {phone}</p>
-                            <p className="text-xs text-sage mt-2">Use code: 123456</p>
+                    <>
+                        {/* Header */}
+                        <div style={styles.header}>
+                            <h1 style={styles.title}>Enter OTP</h1>
+                            <p style={styles.subtitle}>We sent a code to {phone}</p>
+                            <p style={styles.hint}>Use code: 123456</p>
                         </div>
 
-                        <div className="flex gap-2 justify-center">
+                        {/* OTP Inputs */}
+                        <div style={styles.otpContainer}>
                             {otp.map((digit, index) => (
                                 <input
                                     key={index}
@@ -153,7 +167,8 @@ export default function LoginPage() {
                                     onChange={(e) => handleOtpChange(e.target, index)}
                                     onKeyDown={(e) => handleKeyDown(e, index)}
                                     onFocus={(e) => e.target.select()}
-                                    className="w-12 h-14 text-center text-xl bg-white border border-sage/20 rounded-lg focus:border-sage focus:outline-none focus:ring-1 focus:ring-sage transition-all"
+                                    style={styles.otpInput}
+                                    autoFocus={index === 0}
                                 />
                             ))}
                         </div>
@@ -161,17 +176,159 @@ export default function LoginPage() {
                         <button
                             onClick={handleVerify}
                             disabled={loading}
-                            className="w-full bg-sage text-white text-lg font-medium py-4 rounded-xl hover:bg-[#5b7a1e] transition-colors shadow-lg shadow-sage/20 disabled:opacity-50"
+                            style={{
+                                ...styles.submitBtn,
+                                opacity: loading ? 0.7 : 1,
+                                cursor: loading ? 'not-allowed' : 'pointer'
+                            }}
                         >
                             {loading ? 'Verifying...' : 'Verify & Login'}
                         </button>
 
-                        <button onClick={() => setStep('phone')} className="text-sm text-sage hover:underline text-center">
-                            Wrong number? Go back
+                        <button
+                            onClick={() => setStep('phone')}
+                            style={styles.backBtn}
+                        >
+                            ← Wrong number? Go back
                         </button>
-                    </div>
+                    </>
                 )}
+
+                {/* Footer */}
+                <p style={styles.footer}>
+                    Don't have an account?{' '}
+                    <Link to="/signup" style={styles.link}>
+                        Sign Up
+                    </Link>
+                </p>
             </div>
         </div>
     );
 }
+
+const styles = {
+    container: {
+        minHeight: 'calc(100vh - 90px)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#FDFCF0',
+        padding: '40px 20px',
+    },
+    card: {
+        width: '100%',
+        maxWidth: '440px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '28px',
+    },
+    brand: {
+        fontSize: '28px',
+        fontWeight: '700',
+        color: '#2D2D2D',
+        textDecoration: 'none',
+        marginBottom: '16px',
+    },
+    header: {
+        textAlign: 'center',
+    },
+    title: {
+        fontSize: '36px',
+        fontWeight: '700',
+        color: '#2D2D2D',
+        margin: '0 0 12px 0',
+    },
+    subtitle: {
+        fontSize: '18px',
+        color: 'rgba(45, 45, 45, 0.6)',
+        margin: 0,
+    },
+    hint: {
+        fontSize: '14px',
+        color: '#E07A5F',
+        marginTop: '8px',
+        fontWeight: '500',
+    },
+    error: {
+        width: '100%',
+        padding: '14px 20px',
+        backgroundColor: '#FEE2E2',
+        color: '#DC2626',
+        borderRadius: '12px',
+        fontSize: '15px',
+        textAlign: 'center',
+    },
+    inputGroup: {
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+    },
+    label: {
+        fontSize: '16px',
+        fontWeight: '500',
+        color: '#2D2D2D',
+    },
+    input: {
+        width: '100%',
+        padding: '18px 20px',
+        fontSize: '20px',
+        border: '2px solid rgba(45, 45, 45, 0.15)',
+        borderRadius: '14px',
+        backgroundColor: '#FFFFFF',
+        color: '#2D2D2D',
+        outline: 'none',
+        transition: 'border-color 0.3s ease',
+    },
+    otpContainer: {
+        display: 'flex',
+        gap: '12px',
+        justifyContent: 'center',
+    },
+    otpInput: {
+        width: '52px',
+        height: '64px',
+        textAlign: 'center',
+        fontSize: '24px',
+        fontWeight: '600',
+        border: '2px solid rgba(45, 45, 45, 0.15)',
+        borderRadius: '12px',
+        backgroundColor: '#FFFFFF',
+        color: '#2D2D2D',
+        outline: 'none',
+        transition: 'border-color 0.3s ease',
+    },
+    submitBtn: {
+        width: '100%',
+        padding: '18px',
+        fontSize: '18px',
+        fontWeight: '600',
+        color: '#FFFFFF',
+        backgroundColor: '#E07A5F',
+        border: 'none',
+        borderRadius: '14px',
+        transition: 'all 0.3s ease',
+        boxShadow: '0 6px 20px rgba(224, 122, 95, 0.3)',
+    },
+    backBtn: {
+        padding: '12px 20px',
+        fontSize: '15px',
+        color: '#E07A5F',
+        backgroundColor: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        fontWeight: '500',
+    },
+    footer: {
+        fontSize: '16px',
+        color: 'rgba(45, 45, 45, 0.6)',
+        margin: 0,
+        marginTop: '8px',
+    },
+    link: {
+        color: '#E07A5F',
+        fontWeight: '600',
+        textDecoration: 'none',
+    },
+};

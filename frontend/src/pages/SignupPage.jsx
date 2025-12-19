@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+// Questions flow - one by one (Name then Phone)
 const questions = [
     { id: 'name', label: "What should I call you?", placeholder: "Your Name", type: "text" },
-    { id: 'age', label: "How old are you?", placeholder: "Age", type: "number" },
-    { id: 'tone', label: "How should I speak to you?", options: ["Soft & Gentle", "Energetic", "Formal", "Casual"] },
-    { id: 'phone', label: "What is your phone number?", placeholder: "+1 5550000000", type: "tel" }
+    { id: 'phone', label: "What is your phone number?", placeholder: "+91 9876543210", type: "tel" }
 ];
 
 export default function SignupPage() {
@@ -18,18 +17,14 @@ export default function SignupPage() {
     const navigate = useNavigate();
     const question = questions[currentQ];
 
-    const handleNext = async (val) => {
-        const value = val || inputVal;
-
-        if (!value) return;
-
-        // Handle Phone validation specifically if it's the current question
-        if (question.id === 'phone') {
-            // Basic validation or formatting could happen here, 
-            // but we'll do the main formatting before saving.
+    const handleNext = async () => {
+        if (!inputVal.trim()) {
+            setError('Please enter a value to continue');
+            return;
         }
 
-        const newAnswers = { ...answers, [question.id]: value };
+        setError(null);
+        const newAnswers = { ...answers, [question.id]: inputVal.trim() };
         setAnswers(newAnswers);
         setInputVal('');
 
@@ -41,13 +36,21 @@ export default function SignupPage() {
         }
     };
 
+    const handleBack = () => {
+        if (currentQ > 0) {
+            setCurrentQ(currentQ - 1);
+            setInputVal(answers[questions[currentQ - 1].id] || '');
+            setError(null);
+        }
+    };
+
     const saveProfile = async (finalAnswers) => {
         setLoading(true);
         setError(null);
 
-        let phone = finalAnswers.phone || localStorage.getItem('sarthi_phone');
+        let phone = finalAnswers.phone;
         if (!phone) {
-            setError("Phone number is required. Please check step 4.");
+            setError("Phone number is required.");
             setLoading(false);
             return;
         }
@@ -86,60 +89,207 @@ export default function SignupPage() {
     };
 
     return (
-        <div className="min-h-screen flex flex-col justify-center items-center bg-cream p-4 font-sans text-charcoal">
-            <div className="w-full max-w-md">
-                <div className="mb-12 text-center">
-                    <Link to="/" className="text-2xl font-serif font-bold text-sage">Sarthi</Link>
+        <div style={styles.container}>
+            <div style={styles.card}>
+                {/* Brand */}
+                <Link to="/" style={styles.brand}>
+                    Sarthi
+                </Link>
+
+                {/* Progress */}
+                <div style={styles.progress}>
+                    <span style={styles.step}>Step {currentQ + 1} of {questions.length}</span>
+                    <div style={styles.progressBar}>
+                        <div
+                            style={{
+                                ...styles.progressFill,
+                                width: `${((currentQ + 1) / questions.length) * 100}%`
+                            }}
+                        />
+                    </div>
                 </div>
 
+                {/* Question */}
+                <h1 style={styles.question}>{question.label}</h1>
+
+                {/* Error */}
                 {error && (
-                    <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center">
+                    <div style={styles.error}>
                         {error}
                     </div>
                 )}
 
-                <div className="flex flex-col space-y-8">
-                    <div className="space-y-2">
-                        <span className="text-sm font-medium text-sage uppercase tracking-wider">Step {currentQ + 1} of {questions.length}</span>
-                        <h2 className="text-3xl font-serif font-bold text-sage">{question.label}</h2>
-                    </div>
-
-                    {question.options ? (
-                        <div className="grid grid-cols-1 gap-3">
-                            {question.options.map(opt => (
-                                <button
-                                    key={opt}
-                                    onClick={() => handleNext(opt)}
-                                    className="p-4 text-lg border bg-white border-sage/20 rounded-xl hover:border-sage hover:bg-sage/5 transition-colors text-left font-medium"
-                                    disabled={loading}
-                                >
-                                    {opt}
-                                </button>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="space-y-6">
-                            <input
-                                type={question.type}
-                                placeholder={question.placeholder}
-                                value={inputVal}
-                                onChange={(e) => setInputVal(e.target.value)}
-                                className="w-full text-2xl bg-transparent border-b-2 border-sage/30 py-2 focus:outline-none focus:border-sage placeholder-sage/30 transition-colors"
-                                autoFocus
-                                onKeyDown={(e) => e.key === 'Enter' && handleNext()}
-                                disabled={loading}
-                            />
-                            <button
-                                onClick={() => handleNext()}
-                                disabled={loading}
-                                className="w-full bg-clay text-white text-lg font-medium py-4 rounded-xl shadow-lg shadow-clay/20 hover:shadow-xl hover:bg-[#b06a4b] transition-all disabled:opacity-50"
-                            >
-                                {loading ? 'Continue' : 'Continue'}
-                            </button>
-                        </div>
-                    )}
+                {/* Input */}
+                <div style={styles.inputWrapper}>
+                    <input
+                        type={question.type}
+                        placeholder={question.placeholder}
+                        value={inputVal}
+                        onChange={(e) => setInputVal(e.target.value)}
+                        style={styles.input}
+                        autoFocus
+                        onKeyDown={(e) => e.key === 'Enter' && handleNext()}
+                        disabled={loading}
+                    />
                 </div>
+
+                {/* Buttons */}
+                <div style={styles.buttons}>
+                    {currentQ > 0 && (
+                        <button
+                            onClick={handleBack}
+                            style={styles.backBtn}
+                            disabled={loading}
+                        >
+                            ← Back
+                        </button>
+                    )}
+                    <button
+                        onClick={handleNext}
+                        disabled={loading}
+                        style={{
+                            ...styles.continueBtn,
+                            opacity: loading ? 0.7 : 1,
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            marginLeft: currentQ > 0 ? '16px' : '0',
+                            flex: currentQ > 0 ? 1 : 'none',
+                            width: currentQ > 0 ? 'auto' : '100%'
+                        }}
+                    >
+                        {loading ? 'Saving...' : (currentQ === questions.length - 1 ? 'Complete' : 'Continue')}
+                    </button>
+                </div>
+
+                {/* Footer */}
+                <p style={styles.footer}>
+                    Already have an account?{' '}
+                    <Link to="/login" style={styles.link}>
+                        Login
+                    </Link>
+                </p>
             </div>
         </div>
     );
 }
+
+const styles = {
+    container: {
+        minHeight: 'calc(100vh - 90px)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#FDFCF0',
+        padding: '40px 20px',
+    },
+    card: {
+        width: '100%',
+        maxWidth: '500px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '28px',
+    },
+    brand: {
+        fontSize: '28px',
+        fontWeight: '700',
+        color: '#2D2D2D',
+        textDecoration: 'none',
+        marginBottom: '8px',
+    },
+    progress: {
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+    },
+    step: {
+        fontSize: '14px',
+        fontWeight: '600',
+        color: '#E07A5F',
+        textTransform: 'uppercase',
+        letterSpacing: '1px',
+    },
+    progressBar: {
+        width: '100%',
+        height: '6px',
+        backgroundColor: 'rgba(224, 122, 95, 0.2)',
+        borderRadius: '3px',
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        backgroundColor: '#E07A5F',
+        borderRadius: '3px',
+        transition: 'width 0.3s ease',
+    },
+    question: {
+        fontSize: '32px',
+        fontWeight: '700',
+        color: '#2D2D2D',
+        margin: 0,
+        textAlign: 'center',
+        lineHeight: '1.3',
+    },
+    error: {
+        width: '100%',
+        padding: '14px 20px',
+        backgroundColor: '#FEE2E2',
+        color: '#DC2626',
+        borderRadius: '12px',
+        fontSize: '15px',
+        textAlign: 'center',
+    },
+    inputWrapper: {
+        width: '100%',
+    },
+    input: {
+        width: '100%',
+        padding: '20px 24px',
+        fontSize: '24px',
+        border: 'none',
+        borderBottom: '3px solid rgba(45, 45, 45, 0.2)',
+        backgroundColor: 'transparent',
+        color: '#2D2D2D',
+        outline: 'none',
+        textAlign: 'center',
+        transition: 'border-color 0.3s ease',
+    },
+    buttons: {
+        width: '100%',
+        display: 'flex',
+        marginTop: '16px',
+    },
+    backBtn: {
+        padding: '18px 24px',
+        fontSize: '18px',
+        fontWeight: '500',
+        color: '#2D2D2D',
+        backgroundColor: 'transparent',
+        border: '2px solid rgba(45, 45, 45, 0.2)',
+        borderRadius: '14px',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+    },
+    continueBtn: {
+        padding: '18px 32px',
+        fontSize: '18px',
+        fontWeight: '600',
+        color: '#FFFFFF',
+        backgroundColor: '#E07A5F',
+        border: 'none',
+        borderRadius: '14px',
+        transition: 'all 0.3s ease',
+        boxShadow: '0 6px 20px rgba(224, 122, 95, 0.3)',
+    },
+    footer: {
+        fontSize: '16px',
+        color: 'rgba(45, 45, 45, 0.6)',
+        margin: 0,
+        marginTop: '16px',
+    },
+    link: {
+        color: '#E07A5F',
+        fontWeight: '600',
+        textDecoration: 'none',
+    },
+};

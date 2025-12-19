@@ -5,19 +5,19 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
-from elevenlabs import ElevenLabs
+from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from root .env file
+load_dotenv(dotenv_path='../.env')
 
 # ==========================================
 # 1. CONFIGURATION (FROM ENVIRONMENT)
 # ==========================================
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 
-print(GROQ_API_KEY)
+# print(GROQ_API_KEY)
 print(ELEVENLABS_API_KEY)
 
 # Voice ID (Rachel)
@@ -37,7 +37,7 @@ app.add_middleware(
 )
 
 # Initialize Clients
-client_groq = Groq(api_key=GROQ_API_KEY)
+# client_groq = Groq(api_key=GROQ_API_KEY)
 client_eleven = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
 class UserRequest(BaseModel):

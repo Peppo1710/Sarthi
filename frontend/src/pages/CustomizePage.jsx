@@ -1,202 +1,302 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, User, Mic, Heart } from 'lucide-react';
+import { Play, Pause } from 'lucide-react';
 
-const steps = [
-    { id: 1, title: 'Choose your companion', icon: User },
-    { id: 2, title: 'Voice & Tone', icon: Mic },
-    { id: 3, title: 'Interests', icon: Heart },
-];
-
-const avatars = [
-    { id: 'grandson', label: 'Rohan', color: 'bg-blue-100' },
-    { id: 'granddaughter', label: 'Priya', color: 'bg-pink-100' },
-    { id: 'friend', label: 'Amit', color: 'bg-green-100' },
-];
-
-const interestsList = [
-    'Old Bollywood Songs', 'Gardening', 'History (India)',
-    'Cricket', 'Cooking Recipes', 'Spirituality/Bhajans',
-    'Health Tips', 'News', 'Travel Stories'
+// Voice options with titles and descriptions
+const voiceOptions = [
+    { id: 1, title: 'Calm & Deep', description: 'Soothing and slow' },
+    { id: 2, title: 'Warm & Gentle', description: 'Soft and caring' },
+    { id: 3, title: 'Clear & Crisp', description: 'Easy to follow' },
+    { id: 4, title: 'Cheerful', description: 'Bright and happy' },
+    { id: 5, title: 'Patient', description: 'Slow and steady' },
+    { id: 6, title: 'Friendly', description: 'Like an old friend' },
+    { id: 7, title: 'Reassuring', description: 'Calm and confident' },
+    { id: 8, title: 'Expressive', description: 'Full of emotion' },
 ];
 
 export default function CustomizePage() {
-    const [currentStep, setCurrentStep] = useState(1);
-    const [preferences, setPreferences] = useState({
-        avatar: 'granddaughter',
-        tone: 'gentle',
-        speed: 50,
-        interests: []
-    });
+    const [voices, setVoices] = useState([]);
+    const [selectedVoice, setSelectedVoice] = useState(null);
+    const [loadingVoices, setLoadingVoices] = useState(false);
+    const [playingPreview, setPlayingPreview] = useState(null);
+    const [hoveredCard, setHoveredCard] = useState(null);
+    const audioRef = useRef(null);
     const navigate = useNavigate();
 
-    const handleNext = () => {
-        if (currentStep < 3) {
-            setCurrentStep(currentStep + 1);
-        } else {
-            // Save and go to chat
-            console.log('Saving preferences:', preferences);
-            navigate('/chat');
+    // Fetch voices from backend API
+    useEffect(() => {
+        const fetchVoices = async () => {
+            try {
+                setLoadingVoices(true);
+                const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/voices`);
+                if (!response.ok) throw new Error('Failed to fetch voices');
+                const data = await response.json();
+                setVoices(data.voices || []);
+            } catch (err) {
+                console.error('Error fetching voices:', err);
+            } finally {
+                setLoadingVoices(false);
+            }
+        };
+        fetchVoices();
+    }, []);
+
+    // Load saved voice from localStorage on mount
+    useEffect(() => {
+        const savedVoice = localStorage.getItem('selectedVoice');
+        if (savedVoice) {
+            try {
+                setSelectedVoice(JSON.parse(savedVoice));
+            } catch (e) {
+                console.error('Error parsing saved voice:', e);
+            }
+        }
+    }, []);
+
+    // Save selected voice to localStorage
+    const handleVoiceSelect = (voice, voiceOption) => {
+        const voiceData = { ...voice, displayTitle: voiceOption.title, displayDesc: voiceOption.description };
+        setSelectedVoice(voiceData);
+        localStorage.setItem('selectedVoice', JSON.stringify(voiceData));
+    };
+
+    // Play voice preview
+    const playPreview = (previewUrl, voiceId) => {
+        if (playingPreview === voiceId) {
+            audioRef.current?.pause();
+            setPlayingPreview(null);
+            return;
+        }
+
+        if (audioRef.current) {
+            audioRef.current.src = previewUrl;
+            audioRef.current.play();
+            setPlayingPreview(voiceId);
+            audioRef.current.onended = () => setPlayingPreview(null);
         }
     };
 
-    const handleBack = () => {
-        if (currentStep > 1) {
-            setCurrentStep(currentStep - 1);
-        }
+    const handleContinue = () => {
+        navigate('/chat');
     };
 
-    const toggleInterest = (interest) => {
-        setPreferences(prev => {
-            const newInterests = prev.interests.includes(interest)
-                ? prev.interests.filter(i => i !== interest)
-                : [...prev.interests, interest];
-            return { ...prev, interests: newInterests };
-        });
-    };
+    // Merge API voices with display options
+    const displayVoices = voiceOptions.map((option, index) => ({
+        ...option,
+        apiVoice: voices[index] || null
+    }));
 
     return (
-        <div className="flex-1 bg-cream flex flex-col items-center py-8 px-4 w-full max-w-5xl mx-auto">
-            {/* Progress Bar */}
-            <div className="w-full mb-12 flex justify-center items-center gap-4">
-                {steps.map((step, idx) => {
-                    const Icon = step.icon;
-                    const isActive = step.id === currentStep;
-                    const isDone = step.id < currentStep;
+        <div style={styles.container}>
+            <audio ref={audioRef} style={{ display: 'none' }} />
 
-                    return (
-                        <div key={step.id} className="flex items-center">
-                            <div className={`
-                 w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all
-                 ${isActive ? 'border-sage bg-sage text-white' : ''}
-                 ${isDone ? 'border-sage bg-sage/20 text-sage' : 'border-gray-300 text-gray-300'}
-                 ${!isActive && !isDone ? 'bg-white' : ''}
-               `}>
-                                <Icon size={24} />
-                            </div>
-                            {idx < steps.length - 1 && (
-                                <div className={`w-16 h-1 mx-2 ${isDone ? 'bg-sage' : 'bg-gray-200'}`} />
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-
-            <h1 className="text-4xl md:text-5xl font-serif font-bold text-sage mb-12 text-center leading-tight">
-                {steps[currentStep - 1].title}
+            {/* Page Title */}
+            <h1 style={styles.pageTitle}>
+                Choose a voice for your companion
             </h1>
 
-            <div className="w-full max-w-3xl flex-1 flex flex-col">
-                {/* Step 1: Avatar */}
-                {currentStep === 1 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {avatars.map(av => (
-                            <button
-                                key={av.id}
-                                onClick={() => setPreferences({ ...preferences, avatar: av.id })}
-                                className={`
-                            relative h-64 rounded-3xl border-4 flex flex-col items-center justify-center gap-4 transition-all
-                            ${preferences.avatar === av.id
-                                        ? 'border-sage bg-white shadow-xl shadow-sage/20 scale-105'
-                                        : 'border-transparent bg-white hover:bg-sage/5 hover:border-sage/30'}
-                        `}
-                            >
-                                <div className={`w-32 h-32 rounded-full ${av.color} flex items-center justify-center text-4xl`}>
-                                    {av.label[0]}
-                                </div>
-                                <span className="text-2xl font-bold text-charcoal">{av.label}</span>
+            {/* Voice Grid */}
+            <div style={styles.gridContainer}>
+                {loadingVoices ? (
+                    <div style={styles.loadingText}>Loading voices...</div>
+                ) : (
+                    <div style={styles.grid}>
+                        {displayVoices.map((voiceOption) => {
+                            const isSelected = selectedVoice?.displayTitle === voiceOption.title;
+                            const isHovered = hoveredCard === voiceOption.id;
+                            const isPlaying = playingPreview === voiceOption.apiVoice?.voice_id;
 
-                                {preferences.avatar === av.id && (
-                                    <div className="absolute top-4 right-4 w-8 h-8 bg-sage rounded-full flex items-center justify-center text-white">
-                                        <Check size={18} />
-                                    </div>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                {/* Step 2: Voice & Tone */}
-                {currentStep === 2 && (
-                    <div className="space-y-12">
-                        <div className="bg-white p-8 rounded-3xl border border-sage/10 space-y-6">
-                            <label className="text-2xl font-medium text-charcoal block">Speech Speed</label>
-                            <input
-                                type="range"
-                                min="0" max="100"
-                                value={preferences.speed}
-                                onChange={(e) => setPreferences({ ...preferences, speed: parseInt(e.target.value) })}
-                                className="w-full h-4 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sage"
-                            />
-                            <div className="flex justify-between text-lg text-charcoal/60">
-                                <span>Slow & Clear</span>
-                                <span>Normal</span>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-6">
-                            {['Gentle', 'Cheerful'].map(t => (
-                                <button
-                                    key={t}
-                                    onClick={() => setPreferences({ ...preferences, tone: t.toLowerCase() })}
-                                    className={`
-                                py-8 text-2xl font-medium rounded-2xl border-2 transition-all
-                                ${preferences.tone === t.toLowerCase()
-                                            ? 'bg-sage text-white border-sage shadow-lg shadow-sage/20'
-                                            : 'bg-white text-charcoal border-gray-200 hover:border-sage/50'}
-                            `}
-                                >
-                                    {t}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 3: Interests */}
-                {currentStep === 3 && (
-                    <div className="flex flex-wrap gap-4 justify-center">
-                        {interestsList.map(item => {
-                            const isSelected = preferences.interests.includes(item);
                             return (
-                                <button
-                                    key={item}
-                                    onClick={() => toggleInterest(item)}
-                                    className={`
-                                px-6 py-4 rounded-full text-xl font-medium border-2 transition-all
-                                ${isSelected
-                                            ? 'bg-clay text-white border-clay shadow-lg shadow-clay/20'
-                                            : 'bg-white text-charcoal border-sage/20 hover:border-sage'}
-                            `}
+                                <div
+                                    key={voiceOption.id}
+                                    style={{
+                                        ...styles.card,
+                                        ...(isSelected || isHovered ? styles.cardActive : {}),
+                                        transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                                    }}
+                                    onClick={() => voiceOption.apiVoice && handleVoiceSelect(voiceOption.apiVoice, voiceOption)}
+                                    onMouseEnter={() => setHoveredCard(voiceOption.id)}
+                                    onMouseLeave={() => setHoveredCard(null)}
                                 >
-                                    {item}
-                                </button>
+                                    {/* Play Button */}
+                                    <button
+                                        style={{
+                                            ...styles.playButton,
+                                            ...(isSelected || isHovered ? styles.playButtonActive : {}),
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (voiceOption.apiVoice?.preview_url) {
+                                                playPreview(voiceOption.apiVoice.preview_url, voiceOption.apiVoice.voice_id);
+                                            }
+                                        }}
+                                    >
+                                        {isPlaying ? (
+                                            <Pause size={24} color="white" />
+                                        ) : (
+                                            <Play size={24} color="white" style={{ marginLeft: '3px' }} />
+                                        )}
+                                    </button>
+
+                                    {/* Title */}
+                                    <h3 style={styles.cardTitle}>{voiceOption.title}</h3>
+
+                                    {/* Description */}
+                                    <p style={styles.cardDescription}>{voiceOption.description}</p>
+
+                                    {/* Selected indicator */}
+                                    {isSelected && (
+                                        <div style={styles.selectedBadge}>✓</div>
+                                    )}
+                                </div>
                             );
                         })}
                     </div>
                 )}
-
-                {/* Navigation Buttons */}
-                <div className="mt-auto pt-12 flex justify-between items-center">
-                    <button
-                        onClick={handleBack}
-                        disabled={currentStep === 1}
-                        className={`
-                    flex items-center gap-2 px-8 py-4 text-xl font-medium rounded-2xl transition-colors
-                    ${currentStep === 1 ? 'opacity-0 pointer-events-none' : 'text-charcoal hover:bg-black/5'}
-                `}
-                    >
-                        <ArrowLeft size={24} /> Back
-                    </button>
-
-                    <button
-                        onClick={handleNext}
-                        className="flex items-center gap-2 px-10 py-5 bg-sage text-white text-xl font-bold rounded-2xl hover:bg-[#5b7a1e] transition-all shadow-xl shadow-sage/20"
-                    >
-                        {currentStep === 3 ? 'Finish' : 'Next'} <ArrowRight size={24} />
-                    </button>
-                </div>
             </div>
+
+            {/* Save & Continue Button */}
+            <button
+                onClick={handleContinue}
+                disabled={!selectedVoice}
+                style={{
+                    ...styles.continueButton,
+                    ...(selectedVoice ? {} : styles.continueButtonDisabled),
+                }}
+            >
+                Save & Continue
+            </button>
         </div>
     );
+}
+
+const styles = {
+    container: {
+        flex: 1,
+        backgroundColor: '#FDFCF0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '32px 24px 32px',
+        overflow: 'hidden',
+    },
+    pageTitle: {
+        fontSize: '42px',
+        fontWeight: '600',
+        color: '#2D2926',
+        textAlign: 'center',
+        marginBottom: '48px',
+        fontFamily: 'Georgia, serif',
+        lineHeight: '1.3',
+    },
+    gridContainer: {
+        width: '100%',
+        maxWidth: '900px',
+        marginBottom: '48px',
+    },
+    grid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '20px',
+    },
+    loadingText: {
+        textAlign: 'center',
+        color: '#666',
+        fontSize: '18px',
+        padding: '48px',
+    },
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: '16px',
+        padding: '24px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '12px',
+        cursor: 'pointer',
+        transition: 'all 0.25s ease',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        border: '2px solid transparent',
+        position: 'relative',
+    },
+    cardActive: {
+        borderColor: '#E07A5F',
+        boxShadow: '0 8px 24px rgba(224, 122, 95, 0.15)',
+    },
+    playButton: {
+        width: '56px',
+        height: '56px',
+        borderRadius: '50%',
+        backgroundColor: '#E07A5F',
+        border: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        opacity: 0.85,
+    },
+    playButtonActive: {
+        opacity: 1,
+        transform: 'scale(1.05)',
+        boxShadow: '0 4px 12px rgba(224, 122, 95, 0.4)',
+    },
+    cardTitle: {
+        fontSize: '18px',
+        fontWeight: '700',
+        color: '#2D2926',
+        margin: 0,
+        textAlign: 'center',
+    },
+    cardDescription: {
+        fontSize: '14px',
+        color: '#888888',
+        margin: 0,
+        textAlign: 'center',
+    },
+    selectedBadge: {
+        position: 'absolute',
+        top: '8px',
+        right: '8px',
+        width: '24px',
+        height: '24px',
+        borderRadius: '50%',
+        backgroundColor: '#E07A5F',
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '14px',
+        fontWeight: 'bold',
+    },
+    continueButton: {
+        backgroundColor: '#2D2D2D',
+        color: 'white',
+        border: 'none',
+        borderRadius: '12px',
+        padding: '18px 64px',
+        fontSize: '18px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        marginTop: 'auto',
+    },
+    continueButtonDisabled: {
+        backgroundColor: '#CCCCCC',
+        cursor: 'not-allowed',
+    },
+};
+
+// Add responsive styles via media query
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+    @media (max-width: 768px) {
+        .voice-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+    }
+`;
+if (!document.querySelector('#customize-page-styles')) {
+    styleSheet.id = 'customize-page-styles';
+    document.head.appendChild(styleSheet);
 }

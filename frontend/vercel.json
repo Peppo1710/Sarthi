@@ -1,0 +1,31 @@
+{
+    "buildCommand": "npm run build",
+    "outputDirectory": "dist",
+    "devCommand": "npm run dev",
+    "installCommand": "npm install",
+    "framework": "vite",
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ],
+    "headers": [
+        {
+            "source": "/assets/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
+        }
+    ],
+    "env": {
+        "VITE_BACKEND_URL": "@vite_backend_url",
+        "VITE_ELEVENLABS_LUNA_AGENT_ID": "@vite_elevenlabs_luna_agent_id",
+        "VITE_ELEVENLABS_GEORGE_AGENT_ID": "@vite_elevenlabs_george_agent_id",
+        "VITE_ELEVENLABS_SUNNY_AGENT_ID": "@vite_elevenlabs_sunny_agent_id",
+        "VITE_ELEVENLABS_AGENT_ID": "@vite_elevenlabs_agent_id"
+    }
+}
